@@ -74,50 +74,15 @@ var (
 			},
 		),
 	}
-	gc = Client{ApiKey: "test", AppName: "test"}
+	gc = client{
+		ApiKey:  "test",
+		AppName: "test",
+		httpClient: &mocks.MockClient{
+			DoFunc: mocks.GetDoFunc,
+		},
+		httpBuilder: &mocks.MockHttp{BuildRequestFunc: mocks.GetBuildRequestFunc},
+	}
 )
-
-func init() {
-	HttpClient = &mocks.MockClient{}
-	Http = &mocks.MockHttp{}
-}
-
-func mockGetDoFunc() {
-	response := `{"status":"submitted","messageId":"1234-56789"}`
-	responseBody := ioutil.NopCloser(bytes.NewReader([]byte(response)))
-	mocks.GetDoFunc = func(r *http.Request) (*http.Response, error) {
-		return &http.Response{
-			StatusCode: 200,
-			Body:       responseBody,
-		}, nil
-	}
-}
-
-func mockGetBuildRequestFunc() {
-	mocks.GetBuildRequestFunc = func(method, url string, body io.Reader) (*http.Request, error) {
-		return http.NewRequest(method, url, body)
-	}
-}
-
-func assertResponse(t testing.TB, err error, got, want Response) {
-	t.Helper()
-	if err != nil {
-		t.Errorf("didn't expected an error")
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v wanted %v", got, want)
-	}
-}
-
-func assertError(t testing.TB, err error, got, want Response) {
-	t.Helper()
-	if err == nil {
-		t.Errorf("expected an error")
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("text message sent successfully")
-	}
-}
 
 func TestGupshupClient_SendText(t *testing.T) {
 	t.Run("text message sent successfully", func(t *testing.T) {
@@ -320,4 +285,41 @@ func TestGupshupClient_SendInteractiveMessage(t *testing.T) {
 		want := Response{}
 		assertError(t, err, got, want)
 	})
+}
+
+func mockGetDoFunc() {
+	response := `{"status":"submitted","messageId":"1234-56789"}`
+	responseBody := ioutil.NopCloser(bytes.NewReader([]byte(response)))
+	mocks.GetDoFunc = func(r *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: 200,
+			Body:       responseBody,
+		}, nil
+	}
+}
+
+func mockGetBuildRequestFunc() {
+	mocks.GetBuildRequestFunc = func(method, url string, body io.Reader) (*http.Request, error) {
+		return http.NewRequest(method, url, body)
+	}
+}
+
+func assertResponse(t testing.TB, err error, got, want Response) {
+	t.Helper()
+	if err != nil {
+		t.Errorf("didn't expected an error")
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v wanted %v", got, want)
+	}
+}
+
+func assertError(t testing.TB, err error, got, want Response) {
+	t.Helper()
+	if err == nil {
+		t.Errorf("expected an error")
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("text message sent successfully")
+	}
 }

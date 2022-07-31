@@ -14,28 +14,30 @@ const (
 	ContentType = "application/x-www-form-urlencoded"
 )
 
-var (
-	HttpClient httpClient
-	Http       httpBuilder
-)
-
-type httpClient interface {
-	Do(req *http.Request) (*http.Response, error)
+type Client interface {
+	SendText(TextRequest) (Response, error)
+	SendImage(ImageRequest) (Response, error)
+	SendDocument(DocumentRequest) (Response, error)
+	SendAudio(AudioRequest) (Response, error)
+	SendVideo(VideoRequest) (Response, error)
+	SendSticker(StickerRequest) (Response, error)
+	SendInteractiveMessage(InteractiveMessageRequest) (Response, error)
 }
 
-type httpBuilder interface {
-	BuildRequest(method, url string, body io.Reader) (*http.Request, error)
+type client struct {
+	ApiKey      string
+	AppName     string
+	httpClient  httpClient
+	httpBuilder httpBuilder
 }
 
-type httpRequest struct{}
-
-func (r *httpRequest) BuildRequest(method, url string, body io.Reader) (*http.Request, error) {
-	return http.NewRequest(method, url, body)
-}
-
-type Client struct {
-	ApiKey  string
-	AppName string
+func NewClient(apiKey, appName string) *client {
+	return &client{
+		ApiKey:      apiKey,
+		AppName:     appName,
+		httpClient:  &http.Client{},
+		httpBuilder: &httpRequest{},
+	}
 }
 
 type Response struct {
@@ -49,12 +51,44 @@ type TextRequest struct {
 	Text        string
 }
 
+func (g *client) SendText(request TextRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+			"type": "text",
+			"text": "%s"
+		}`, request.Text)},
+	}
+
+	return g.sendRequest(requestBody)
+}
+
 type ImageRequest struct {
 	Source      string
 	Destination string
 	Image       string
 	Preview     string
 	Caption     string
+}
+
+func (g *client) SendImage(request ImageRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+				"type": "image",
+				"originalUrl": "%s",
+				"previewUrl": "%s",
+				"caption": "%s"
+			}`, request.Image, request.Preview, request.Caption)},
+	}
+
+	return g.sendRequest(requestBody)
 }
 
 type DocumentRequest struct {
@@ -64,10 +98,41 @@ type DocumentRequest struct {
 	Filename    string
 }
 
+func (g *client) SendDocument(request DocumentRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+				"type": "file",
+				"url": "%s",
+			    "filename": "%s"
+			}`, request.Url, request.Filename)},
+	}
+
+	return g.sendRequest(requestBody)
+}
+
 type AudioRequest struct {
 	Source      string
 	Destination string
 	Url         string
+}
+
+func (g *client) SendAudio(request AudioRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+				"type": "audio",
+				"url": "%s"
+			}`, request.Url)},
+	}
+
+	return g.sendRequest(requestBody)
 }
 
 type VideoRequest struct {
@@ -77,10 +142,41 @@ type VideoRequest struct {
 	Caption     string
 }
 
+func (g *client) SendVideo(request VideoRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+				"type": "video",
+				"url": "%s",
+				"caption": "%s"
+			}`, request.Url, request.Caption)},
+	}
+
+	return g.sendRequest(requestBody)
+}
+
 type StickerRequest struct {
 	Source      string
 	Destination string
 	Url         string
+}
+
+func (g *client) SendSticker(request StickerRequest) (Response, error) {
+	requestBody := url.Values{
+		"channel":     {"whatsapp"},
+		"source":      {request.Source},
+		"destination": {request.Destination},
+		"src.name":    {g.AppName},
+		"message": {fmt.Sprintf(`{
+				"type": "sticker",
+				"url": "%s"
+			}`, request.Url)},
+	}
+
+	return g.sendRequest(requestBody)
 }
 
 type InteractiveMessageRequest struct {
@@ -114,105 +210,6 @@ type InteractiveMessageOptions struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Postback    string `json:"postbackText"`
-}
-
-func init() {
-	HttpClient = &http.Client{}
-	Http = &httpRequest{}
-}
-
-func (g *Client) SendText(request TextRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-			"type": "text",
-			"text": "%s"
-		}`, request.Text)},
-	}
-
-	return g.sendRequest(requestBody)
-}
-
-func (g *Client) SendImage(request ImageRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-				"type": "image",
-				"originalUrl": "%s",
-				"previewUrl": "%s",
-				"caption": "%s"
-			}`, request.Image, request.Preview, request.Caption)},
-	}
-
-	return g.sendRequest(requestBody)
-}
-
-func (g *Client) SendDocument(request DocumentRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-				"type": "file",
-				"url": "%s",
-			    "filename": "%s"
-			}`, request.Url, request.Filename)},
-	}
-
-	return g.sendRequest(requestBody)
-}
-
-func (g *Client) SendAudio(request AudioRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-				"type": "audio",
-				"url": "%s"
-			}`, request.Url)},
-	}
-
-	return g.sendRequest(requestBody)
-}
-
-func (g *Client) SendVideo(request VideoRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-				"type": "video",
-				"url": "%s",
-				"caption": "%s"
-			}`, request.Url, request.Caption)},
-	}
-
-	return g.sendRequest(requestBody)
-}
-
-func (g *Client) SendSticker(request StickerRequest) (Response, error) {
-	requestBody := url.Values{
-		"channel":     {"whatsapp"},
-		"source":      {request.Source},
-		"destination": {request.Destination},
-		"src.name":    {g.AppName},
-		"message": {fmt.Sprintf(`{
-				"type": "sticker",
-				"url": "%s"
-			}`, request.Url)},
-	}
-
-	return g.sendRequest(requestBody)
 }
 
 func NewInteractiveMessage(body, title, messageId string,
@@ -251,7 +248,7 @@ func NewButton(title string) InteractiveGlobalButtons {
 	}
 }
 
-func (g *Client) SendInteractiveMessage(request InteractiveMessageRequest) (Response, error) {
+func (g *client) SendInteractiveMessage(request InteractiveMessageRequest) (Response, error) {
 	message, _ := json.Marshal(request.InteractiveMessage)
 	requestBody := url.Values{
 		"channel":     {"whatsapp"},
@@ -264,16 +261,16 @@ func (g *Client) SendInteractiveMessage(request InteractiveMessageRequest) (Resp
 	return g.sendRequest(requestBody)
 }
 
-func (g *Client) sendRequest(requestBody url.Values) (Response, error) {
+func (g *client) sendRequest(requestBody url.Values) (Response, error) {
 	var response Response
-	httpRequest, err := Http.BuildRequest("POST", MessageUrl, strings.NewReader(requestBody.Encode()))
+	httpRequest, err := g.httpBuilder.BuildRequest("POST", MessageUrl, strings.NewReader(requestBody.Encode()))
 	if err != nil {
 		return response, err
 	}
 	httpRequest.Header.Set("Content-Type", ContentType)
 	httpRequest.Header.Set("apikey", g.ApiKey)
 
-	resp, err := HttpClient.Do(httpRequest)
+	resp, err := g.httpClient.Do(httpRequest)
 
 	if err != nil {
 		return response, err
